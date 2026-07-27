@@ -155,7 +155,9 @@ price-tracker/
 │   │   ├── price_history.py          # Price history SQLAlchemy model
 │   │   └── user.py                   # User SQLAlchemy model
 │   ├── schemas/
+│   │   ├── health.py                 # Health check Pydantic schemas
 │   │   ├── item.py                   # Item Pydantic schemas
+│   │   ├── pagination.py            # Pagination Pydantic schemas
 │   │   ├── password_change.py        # Password change Pydantic schema
 │   │   ├── price_history.py          # Price history Pydantic schema
 │   │   ├── refresh_token.py          # Refresh token Pydantic schema
@@ -170,6 +172,7 @@ price-tracker/
 ├── tests/
 │   ├── conftest.py                   # Pytest fixtures
 │   ├── test_auth.py                  # Authentication tests
+│   ├── test_health.py                # Health check tests
 │   ├── test_items.py                 # Item CRUD tests
 │   ├── test_scraper.py               # Web scraper tests
 │   ├── test_users.py                 # User management tests
@@ -342,7 +345,8 @@ POST /items/
 | DELETE | `/users/me/` | Deactivate account |
 | GET | `/users/` | List all users (Admin only) |
 | GET | `/users/{user_id}` | Get user by ID (Admin only) |
-| PATCH | `/users/{user_id}/status` | Update user status (Admin only) |
+| PATCH | `/users/{user_id}/deactivate` | Deactivate user (Admin only) |
+| PATCH | `/users/{user_id}/activate` | Activate user (Admin only) |
 | DELETE | `/users/{user_id}` | Delete user (Admin only) |
 
 **Items & Tracking**
@@ -357,16 +361,12 @@ POST /items/
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/live` | Liveness probe |
-| GET | `/ready` | Readiness probe |
+| GET | `/health/live` | Liveness probe |
+| GET | `/health/ready` | Readiness probe |
 
 ## 🗄 Database Seeding
 
-Database seeding is **not automatic** — after the containers are up, run the seed script manually inside the `api` container:
-
-```bash
-docker-compose exec api python -m app.database.seed
-```
+Database seeding is **automatic** — it runs during application startup in the `lifespan` function of `main.py`.
 
 This creates the following test accounts:
 
