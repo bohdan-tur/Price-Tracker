@@ -1,38 +1,82 @@
+
+x-runtime-env: &runtime-env
+  PYTHONPATH: /app
+  PYTHONUNBUFFERED: "1"
+  ENVIRONMENT: ${ENVIRONMENT:-development}
+  DEBUG: ${DEBUG:-false}
+
+x-database-env: &database-env
+  DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+
+x-auth-env: &auth-env
+  ACCESS_TOKEN_SECRET_KEY: ${ACCESS_TOKEN_SECRET_KEY:?ACCESS_TOKEN_SECRET_KEY is required}
+  REFRESH_TOKEN_SECRET_KEY: ${REFRESH_TOKEN_SECRET_KEY:?REFRESH_TOKEN_SECRET_KEY is required}
+  ALGORITHM: ${ALGORITHM:-HS256}
+  ACCESS_TOKEN_EXPIRES_MINUTES: ${ACCESS_TOKEN_EXPIRES_MINUTES:-20}
+  REFRESH_TOKEN_EXPIRES_DAYS: ${REFRESH_TOKEN_EXPIRES_DAYS:-14}
+
+x-seed-env: &seed-env
+  SEED_DEFAULT_USERS: ${SEED_DEFAULT_USERS:-false}
+  SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+  SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:-}
+
+
+x-postgres-env: &postgres-env
+  POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+  POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+
+x-test-postgres-env: &test-postgres-env
+  POSTGRES_USER: ${TEST_POSTGRES_USER:-test_user}
+  POSTGRES_PASSWORD: ${TEST_POSTGRES_PASSWORD:-test_password_change_me}
+  POSTGRES_DB: ${TEST_POSTGRES_DB:-test_price_tracker}
+
+
 services:
 
   db:
     image: postgres:15-alpine
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER}" ]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 10
     environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+      <<: *postgres-env
     ports:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
+  migrations:
+    build: .
+    command: alembic upgrade head
+    environment:
+      <<: [*runtime-env, *database-env, *auth-env]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
   test_db:
     image: postgres:15-alpine
+    profiles: ["test"]
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${TEST_POSTGRES_USER}" ]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 10
     environment:
-      - POSTGRES_USER=${TEST_POSTGRES_USER}
-      - POSTGRES_PASSWORD=${TEST_POSTGRES_PASSWORD}
-      - POSTGRES_DB=${TEST_POSTGRES_DB}
+      <<: *test-postgres-env
     ports:
       - "5434:5432"
 
   redis:
     image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     container_name: price_tracker_redis
     restart: unless-stopped
     ports:
@@ -43,21 +87,7 @@ services:
     container_name: price_tracker_api
     restart: unless-stopped
     environment:
-      - PYTHONPATH=/app
-      - DATABASE_URL=${DATABASE_URL}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - TEST_POSTGRES_USER=${TEST_POSTGRES_USER}
-      - TEST_POSTGRES_PASSWORD=${TEST_POSTGRES_PASSWORD}
-      - TEST_POSTGRES_DB=${TEST_POSTGRES_DB}
-      - TEST_DATABASE_URL=${TEST_DATABASE_URL}
-      - ACCESS_TOKEN_SECRET_KEY=${ACCESS_TOKEN_SECRET_KEY}
-      - REFRESH_TOKEN_SECRET_KEY=${REFRESH_TOKEN_SECRET_KEY}
-      - ALGORITHM=${ALGORITHM}
-      - SEED_ADMIN_PASSWORD=${SEED_ADMIN_PASSWORD}
-      - SEED_USER_PASSWORD=${SEED_USER_PASSWORD}
-      - PYTHONUNBUFFERED=1
+      <<: [*runtime-env, *database-env, *auth-env, *seed-env]
     ports:
       - "8000:8000"
     volumes:
@@ -65,10 +95,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      test_db:
-        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
       redis:
-        condition: service_started
+        condition: service_healthy
 
   celery_worker:
     build: .
@@ -76,53 +106,31 @@ services:
     restart: unless-stopped
     command: celery -A app.worker.worker.celery_app worker --loglevel=info
     environment:
-      - PYTHONPATH=/app
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - DATABASE_URL=${DATABASE_URL}
-      - TEST_DATABASE_URL=${TEST_DATABASE_URL}
-      - TEST_POSTGRES_USER=${TEST_POSTGRES_USER}
-      - TEST_POSTGRES_PASSWORD=${TEST_POSTGRES_PASSWORD}
-      - TEST_POSTGRES_DB=${TEST_POSTGRES_DB}
-      - ACCESS_TOKEN_SECRET_KEY=${ACCESS_TOKEN_SECRET_KEY}
-      - REFRESH_TOKEN_SECRET_KEY=${REFRESH_TOKEN_SECRET_KEY}
-      - ALGORITHM=${ALGORITHM}
-      - SEED_ADMIN_PASSWORD=${SEED_ADMIN_PASSWORD}
-      - SEED_USER_PASSWORD=${SEED_USER_PASSWORD}
+      <<: [*runtime-env, *database-env, *auth-env]
     volumes:
       - .:/app
     depends_on:
-      - db
-      - redis
-      - api
+      migrations:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
 
   celery_beat:
-      build: .
-      container_name: price_tracker_beat
-      restart: unless-stopped
-      command: celery -A app.worker.worker.celery_app beat --loglevel=info
-      environment:
-        - PYTHONPATH=/app
-        - POSTGRES_USER=${POSTGRES_USER}
-        - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-        - POSTGRES_DB=${POSTGRES_DB}
-        - DATABASE_URL=${DATABASE_URL}
-        - TEST_DATABASE_URL=${TEST_DATABASE_URL}
-        - TEST_POSTGRES_USER=${TEST_POSTGRES_USER}
-        - TEST_POSTGRES_PASSWORD=${TEST_POSTGRES_PASSWORD}
-        - TEST_POSTGRES_DB=${TEST_POSTGRES_DB}
-        - ACCESS_TOKEN_SECRET_KEY=${ACCESS_TOKEN_SECRET_KEY}
-        - REFRESH_TOKEN_SECRET_KEY=${REFRESH_TOKEN_SECRET_KEY}
-        - ALGORITHM=${ALGORITHM}
-        - SEED_ADMIN_PASSWORD=${SEED_ADMIN_PASSWORD}
-        - SEED_USER_PASSWORD=${SEED_USER_PASSWORD}
-      volumes:
-        - .:/app
-      depends_on:
-        - db
-        - redis
-        - celery_worker
+    build: .
+    container_name: price_tracker_beat
+    restart: unless-stopped
+    command: celery -A app.worker.worker.celery_app beat --loglevel=info
+    environment:
+      <<: [*runtime-env, *database-env, *auth-env]
+    volumes:
+      - .:/app
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      celery_worker:
+        condition: service_started
 
 volumes:
   postgres_data:
