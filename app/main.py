@@ -3,7 +3,6 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routers import auth, health, item, user
 from app.core.config import settings
@@ -18,29 +17,24 @@ logger = logging.getLogger("root")
 async def lifespan(app: FastAPI):
     logger.info("Application starting...")
 
-    try:
-        logger.info("Starting database seeding...")
-        await seed_database()
-        logger.info("Database seeding completed successfully.")
-    except Exception as e:
-        logger.error(f"Error during database seeding: {e}")
+    if settings.SEED_DEFAULT_USERS:
+        try:
+            logger.info("Starting database seeding...")
+            await seed_database()
+            logger.info("Database seeding completed successfully")
+        except Exception:
+            logger.exception("Error during database seeding")
+            raise
 
     logger.info("Application started successfully")
 
-    yield
-
-    logger.info("Application is shutting down")
+    try:
+        yield
+    finally:
+        logger.info("Application is shutting down")
 
 
 app = FastAPI(title="Price Tracker", description="Price Tracker API", lifespan=lifespan)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 @app.middleware("http")
