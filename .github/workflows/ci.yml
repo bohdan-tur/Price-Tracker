@@ -18,6 +18,9 @@ jobs:
       REFRESH_TOKEN_EXPIRES_DAYS: "14"
       DEBUG: "false"
       SEED_DEFAULT_USERS: "false"
+      SCRAPER_ALLOWED_DOMAINS: '["rozetka.com.ua"]'
+      SCRAPER_MAX_RESPONSE_BYTES: "2097152"
+      SCRAPER_MAX_URL_LENGTH: "2048"
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ci_postgres_password
       POSTGRES_DB: price_tracker

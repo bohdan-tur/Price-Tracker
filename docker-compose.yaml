@@ -15,6 +15,11 @@ x-auth-env: &auth-env
   ACCESS_TOKEN_EXPIRES_MINUTES: ${ACCESS_TOKEN_EXPIRES_MINUTES:-20}
   REFRESH_TOKEN_EXPIRES_DAYS: ${REFRESH_TOKEN_EXPIRES_DAYS:-14}
 
+x-scraper-env: &scraper-env
+  SCRAPER_ALLOWED_DOMAINS: ${SCRAPER_ALLOWED_DOMAINS:?SCRAPER_ALLOWED_DOMAINS is required}
+  SCRAPER_MAX_RESPONSE_BYTES: ${SCRAPER_MAX_RESPONSE_BYTES:-2097152}
+  SCRAPER_MAX_URL_LENGTH: ${SCRAPER_MAX_URL_LENGTH:-2048}
+
 x-seed-env: &seed-env
   SEED_DEFAULT_USERS: ${SEED_DEFAULT_USERS:-false}
   SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
@@ -52,7 +57,7 @@ services:
     build: .
     command: alembic upgrade head
     environment:
-      <<: [*runtime-env, *database-env, *auth-env]
+      <<: [*runtime-env, *database-env, *auth-env, *scraper-env]
     depends_on:
       db:
         condition: service_healthy
@@ -87,7 +92,7 @@ services:
     container_name: price_tracker_api
     restart: unless-stopped
     environment:
-      <<: [*runtime-env, *database-env, *auth-env, *seed-env]
+      <<: [*runtime-env, *database-env, *auth-env, *scraper-env, *seed-env]
     ports:
       - "8000:8000"
     volumes:
@@ -106,7 +111,7 @@ services:
     restart: unless-stopped
     command: celery -A app.worker.worker.celery_app worker --loglevel=info
     environment:
-      <<: [*runtime-env, *database-env, *auth-env]
+      <<: [*runtime-env, *database-env, *auth-env, *scraper-env]
     volumes:
       - .:/app
     depends_on:
@@ -121,7 +126,7 @@ services:
     restart: unless-stopped
     command: celery -A app.worker.worker.celery_app beat --loglevel=info
     environment:
-      <<: [*runtime-env, *database-env, *auth-env]
+      <<: [*runtime-env, *database-env, *auth-env, *scraper-env]
     volumes:
       - .:/app
     depends_on:

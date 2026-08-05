@@ -8,7 +8,7 @@ from app.models.price_history import PriceHistory
 from app.models.user import User
 from app.schemas.item import ItemCreate, ItemResponse
 from app.schemas.pagination import PaginationParams, get_pagination
-from app.services.scraper import get_current_price
+from app.services.scraper import UnsafeScraperURLError, get_current_price
 
 router = APIRouter(prefix="/items", tags=["items"])
 
@@ -17,7 +17,14 @@ router = APIRouter(prefix="/items", tags=["items"])
 async def create_item(
     item: ItemCreate, db: db_dependency, user: User = Depends(get_current_user)
 ) -> ItemResponse:
-    fetched_price = await get_current_price(str(item.url))
+
+    try:
+        fetched_price = await get_current_price(str(item.url))
+    except UnsafeScraperURLError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
 
     new_item = Item(
         title=item.title,
