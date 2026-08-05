@@ -1,7 +1,7 @@
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRES_MINUTES: int = Field(default=20, gt=0)
     REFRESH_TOKEN_EXPIRES_DAYS: int = Field(default=14, gt=0)
 
+    SCRAPER_ALLOWED_DOMAINS: list[str]
+    SCRAPER_MAX_RESPONSE_BYTES: int = Field(default=2_097_152, gt=0)
+    SCRAPER_MAX_URL_LENGTH: int = Field(default=2_048, gt=0)
+
     DEBUG: bool = False
 
     SEED_DEFAULT_USERS: bool = False
@@ -38,6 +42,17 @@ class Settings(BaseSettings):
         extra="ignore",
         env_ignore_empty=True,
     )
+
+    @field_validator("SCRAPER_ALLOWED_DOMAINS")
+    @classmethod
+    def validate_scraper_allowed_domains(cls, value: list[str]) -> list[str]:
+        domains = [domain.strip().lower() for domain in value]
+        normalized_domains = list(dict.fromkeys(domain for domain in domains if domain))
+
+        if not normalized_domains:
+            raise ValueError("SCRAPER_ALLOWED_DOMAINS must contain at least one domain")
+
+        return normalized_domains
 
     @model_validator(mode="after")
     def validate_security_settings(self) -> "Settings":
