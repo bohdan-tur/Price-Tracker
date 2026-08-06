@@ -5,6 +5,7 @@ import logging
 import re
 import socket
 from dataclasses import dataclass
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from urllib.parse import urlparse
 
 import httpx
@@ -23,6 +24,7 @@ COMMON_SELECTORS = [
     ".price__value",
     ".product-price",
 ]
+PRICE_QUANTUM = Decimal("0.01")
 
 
 class UnsafeScraperURLError(ValueError):
@@ -194,7 +196,20 @@ async def _read_limited_response(response: httpx.Response) -> bytes:
     return bytes(body)
 
 
-def _extract_price(html: bytes) -> float | None:
+def _parse_decimal_price(value: object) -> Decimal | None:
+    try:
+        price = Decimal(str(value))
+
+        if not price.is_finite() or price <= 0:
+            return None
+
+        return price.quantize(PRICE_QUANTUM, rounding=ROUND_HALF_UP)
+
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+
+
+def _extract_price(html: bytes) -> Decimal | None:
 
     soup = BeautifulSoup(html, "lxml")
 
@@ -224,26 +239,20 @@ def _extract_price(html: bytes) -> float | None:
                 if not isinstance(offer, dict):
                     continue
 
-                price = offer.get("price")
+                price = _parse_decimal_price(offer.get("price"))
 
                 if price is not None:
-                    try:
-                        return float(price)
-
-                    except (TypeError, ValueError):
-                        continue
+                    return price
 
     price_meta = soup.find("meta", property="product:price:amount")
 
     if price_meta:
         content = price_meta.get("content")
 
-        if content is not None:
-            try:
-                return float(content)
+        price = _parse_decimal_price(content)
 
-            except (TypeError, ValueError):
-                pass
+        if price is not None:
+            return price
 
     price_element = soup.select_one(", ".join(COMMON_SELECTORS))
 
@@ -257,16 +266,12 @@ def _extract_price(html: bytes) -> float | None:
         )
 
         if cleaned_text and len(cleaned_text) < 10:
-            try:
-                return float(cleaned_text)
-
-            except ValueError:
-                pass
+            return _parse_decimal_price(cleaned_text)
 
     return None
 
 
-async def get_current_price(url: str) -> float | None:
+async def get_current_price(url: str) -> Decimal | None:
 
     target = await validate_scraper_url(url)
 
