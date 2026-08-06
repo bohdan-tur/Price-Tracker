@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from app.core.config import settings
 from app.database.db import Base
 from app.models.item import Item
+from app.models.notification_event import NotificationEvent
 from app.models.price_history import PriceHistory
 from app.models.user import User
 

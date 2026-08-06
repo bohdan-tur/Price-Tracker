@@ -1,6 +1,9 @@
-from pydantic import BaseModel, ConfigDict, HttpUrl
+from datetime import datetime
+from decimal import Decimal
 
-from app.schemas.price_history import PriceHistoryResponse
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+
+from app.models.item import ItemStatus
 
 
 class ItemBase(BaseModel):
@@ -9,13 +12,21 @@ class ItemBase(BaseModel):
 
 
 class ItemCreate(ItemBase):
-    pass
+    target_price: Decimal = Field(
+        gt=Decimal("0"),
+        max_digits=12,
+        decimal_places=2,
+    )
 
 
 class ItemResponse(ItemBase):
     id: int
-    current_price: float | None
+    current_price: Decimal | None
+    target_price: Decimal | None
+    currency: str
+    status: ItemStatus
+    last_checked_at: datetime | None
+    last_error: str | None
     user_id: int
-    price_histories: list[PriceHistoryResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
