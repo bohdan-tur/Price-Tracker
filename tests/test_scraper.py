@@ -1,5 +1,6 @@
 import asyncio
 import socket
+from decimal import Decimal
 
 import httpx
 import pytest
@@ -35,7 +36,7 @@ async def test_get_current_price_success(httpx_mock, public_dns):
     fake_html = """
     <html>
         <body>
-            <span class="price__value">1500.00</span>
+            <span class="price__value">1500.10</span>
         </body>
     </html>
     """
@@ -49,7 +50,8 @@ async def test_get_current_price_success(httpx_mock, public_dns):
 
     price = await get_current_price("https://rozetka.com.ua/fake_item/")
 
-    assert price == 1500.0
+    assert price == Decimal("1500.10")
+    assert isinstance(price, Decimal)
 
 
 async def test_get_current_price_not_found(httpx_mock, public_dns):

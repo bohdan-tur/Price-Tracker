@@ -1,11 +1,13 @@
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, field_serializer
 
 
 class PriceHistoryResponse(BaseModel):
     id: int
-    price: float
+    price: Decimal
+    currency: str
     recorded_at: datetime
 
     @field_serializer("recorded_at")
