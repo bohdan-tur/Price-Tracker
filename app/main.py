@@ -1,10 +1,12 @@
+import asyncio
 import logging
 import time
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
 
 from app.api.routers import auth, health, item, telegram, user
+from app.bot.application import run_telegram_polling
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.database.seed import seed_database
@@ -15,6 +17,7 @@ logger = logging.getLogger("root")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    polling_task: asyncio.Task[None] | None = None
     logger.info("Application starting...")
 
     if settings.SEED_DEFAULT_USERS:
@@ -25,12 +28,19 @@ async def lifespan(app: FastAPI):
         except Exception:
             logger.exception("Error during database seeding")
             raise
+    if settings.TELEGRAM_POLLING_ENABLED:
+        polling_task = asyncio.create_task(run_telegram_polling())
+        logger.info("Telegram polling started")
 
     logger.info("Application started successfully")
 
     try:
         yield
     finally:
+        if polling_task is not None:
+            polling_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await polling_task
         logger.info("Application is shutting down")
 
 
