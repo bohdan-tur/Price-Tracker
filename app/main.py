@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 
-from app.api.routers import auth, health, item, user
+from app.api.routers import auth, health, item, telegram, user
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.database.seed import seed_database
@@ -56,4 +56,5 @@ async def log_requests(request: Request, call_next):
 app.include_router(auth.router)
 app.include_router(user.router)
 app.include_router(item.router)
+app.include_router(telegram.router)
 app.include_router(health.router)
