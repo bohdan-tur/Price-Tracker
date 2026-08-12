@@ -25,6 +25,11 @@ x-seed-env: &seed-env
   SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
   SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:-}
 
+x-telegram-env: &telegram-env
+  TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+  TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+  TELEGRAM_POLLING_ENABLED: ${TELEGRAM_POLLING_ENABLED:-false}
+
 
 x-postgres-env: &postgres-env
   POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
@@ -92,7 +97,7 @@ services:
     container_name: price_tracker_api
     restart: unless-stopped
     environment:
-      <<: [*runtime-env, *database-env, *auth-env, *scraper-env, *seed-env]
+      <<: [*runtime-env, *database-env, *auth-env, *scraper-env, *seed-env, *telegram-env]
     ports:
       - "8000:8000"
     volumes:
@@ -111,7 +116,7 @@ services:
     restart: unless-stopped
     command: celery -A app.worker.worker.celery_app worker --loglevel=info
     environment:
-      <<: [*runtime-env, *database-env, *auth-env, *scraper-env]
+      <<: [*runtime-env, *database-env, *auth-env, *scraper-env, *telegram-env]
     volumes:
       - .:/app
     depends_on:
