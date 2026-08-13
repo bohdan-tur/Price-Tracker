@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     SCRAPER_MAX_RESPONSE_BYTES: int = Field(default=2_097_152, gt=0)
     SCRAPER_MAX_URL_LENGTH: int = Field(default=2_048, gt=0)
 
+    TELEGRAM_BOT_TOKEN: str | None = None
+    TELEGRAM_BOT_USERNAME: str | None = None
+    TELEGRAM_POLLING_ENABLED: bool = False
+
     DEBUG: bool = False
 
     SEED_DEFAULT_USERS: bool = False
@@ -54,8 +58,25 @@ class Settings(BaseSettings):
 
         return normalized_domains
 
+    @field_validator("TELEGRAM_BOT_USERNAME")
+    @classmethod
+    def normalize_telegram_bot_username(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+
+        username = value.strip().removeprefix("@")
+        return username or None
+
     @model_validator(mode="after")
     def validate_security_settings(self) -> "Settings":
+
+        if self.TELEGRAM_POLLING_ENABLED and (
+            not self.TELEGRAM_BOT_TOKEN or not self.TELEGRAM_BOT_USERNAME
+        ):
+            raise ValueError(
+                "Telegram bot token and username are required when polling is enabled"
+            )
+
         secrets = {
             "ACCESS_TOKEN_SECRET_KEY": self.ACCESS_TOKEN_SECRET_KEY,
             "REFRESH_TOKEN_SECRET_KEY": self.REFRESH_TOKEN_SECRET_KEY,
