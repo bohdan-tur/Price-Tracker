@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 
 from app.api.dependencies import db_dependency, get_current_user
+from app.core.rate_limit import limiter
 from app.models.item import Item, ItemStatus
 from app.models.price_history import PriceHistory
 from app.models.user import User
@@ -15,8 +16,12 @@ router = APIRouter(prefix="/items", tags=["items"])
 
 
 @router.post("/", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
 async def create_item(
-    item: ItemCreate, db: db_dependency, user: User = Depends(get_current_user)
+    request: Request,
+    item: ItemCreate,
+    db: db_dependency,
+    user: User = Depends(get_current_user),
 ) -> ItemResponse:
 
     try:

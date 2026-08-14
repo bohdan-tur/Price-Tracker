@@ -1,5 +1,6 @@
 from httpx import AsyncClient
 
+from app.core.rate_limit import limiter
 from app.core.security import create_refresh_token
 
 
@@ -49,6 +50,25 @@ async def test_login_wrong_password(async_client: AsyncClient, create_test_user)
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Incorrect password"
+
+
+async def test_login_rate_limit(async_client: AsyncClient):
+    limiter.reset()
+    payload = {
+        "username": "rate-limit-test@example.com",
+        "password": "wrong-password",
+    }
+
+    try:
+        for _ in range(5):
+            response = await async_client.post("/auth/login", data=payload)
+            assert response.status_code == 401
+
+        response = await async_client.post("/auth/login", data=payload)
+
+        assert response.status_code == 429
+    finally:
+        limiter.reset()
 
 
 async def test_protected_route_without_token(async_client):

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import NullPool
 
 from app.core.config import Environment, settings
+from app.core.rate_limit import limiter
 from app.core.security import get_password_hash
 from app.database.db import Base, get_session
 from app.main import app
@@ -32,6 +33,8 @@ test_session = async_sessionmaker(
 
 @pytest_asyncio.fixture(autouse=True, scope="session")
 async def prepare_db():
+    limiter.reset()
+
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -40,6 +43,7 @@ async def prepare_db():
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
     await test_engine.dispose()
+    limiter.reset()
 
 
 @pytest_asyncio.fixture

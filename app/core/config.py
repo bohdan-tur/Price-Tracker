@@ -19,6 +19,7 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str
     TEST_DATABASE_URL: str | None = None
+    RATE_LIMIT_STORAGE_URI: str
 
     ACCESS_TOKEN_SECRET_KEY: str
     REFRESH_TOKEN_SECRET_KEY: str

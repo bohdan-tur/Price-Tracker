@@ -1,10 +1,11 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 
 from app.api.dependencies import db_dependency
+from app.core.rate_limit import limiter
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -22,7 +23,10 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post(
     "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
 )
-async def register_user(user_data: UserCreate, db: db_dependency) -> UserResponse:
+@limiter.limit("3/hour")
+async def register_user(
+    request: Request, user_data: UserCreate, db: db_dependency
+) -> UserResponse:
     query = await db.execute(select(User).where(User.email == user_data.email))
     existing_user = query.scalar_one_or_none()
     if existing_user:
@@ -37,8 +41,11 @@ async def register_user(user_data: UserCreate, db: db_dependency) -> UserRespons
 
 
 @router.post("/login", status_code=status.HTTP_200_OK, response_model=dict)
+@limiter.limit("5/minute")
 async def login(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: db_dependency
+    request: Request,
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    db: db_dependency,
 ) -> dict:
     query = await db.execute(select(User).where(User.email == form_data.username))
     user = query.scalar_one_or_none()
@@ -71,7 +78,10 @@ async def login(
 
 
 @router.post("/refresh_token", status_code=status.HTTP_200_OK, response_model=dict)
-async def refresh_token(request_data: RefreshTokenRequest, db: db_dependency) -> dict:
+@limiter.limit("10/minute")
+async def refresh_token(
+    request: Request, request_data: RefreshTokenRequest, db: db_dependency
+) -> dict:
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
