@@ -2,19 +2,19 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 from fastapi import HTTPException, status
-from passlib.context import CryptContext
+from pwdlib import PasswordHash
 
 from app.core.config import settings
 
-crypt_context = CryptContext(schemes=["argon2"], deprecated="auto")
+password_hash = PasswordHash.recommended()
 
 
 def get_password_hash(password: str) -> str:
-    return crypt_context.hash(password)
+    return password_hash.hash(password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return crypt_context.verify(plain_password, hashed_password)
+    return password_hash.verify(plain_password, hashed_password)
 
 
 def _create_token(data: dict, expires_delta: timedelta, secret_key: str) -> str:
