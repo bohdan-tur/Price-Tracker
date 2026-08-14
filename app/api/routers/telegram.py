@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.api.dependencies import db_dependency, get_current_user
 from app.core.config import settings
+from app.core.rate_limit import limiter
 from app.models.user import User
 from app.schemas.telegram import TelegramLinkResponse
 from app.services.telegram_link_service import (
@@ -17,8 +18,11 @@ router = APIRouter(prefix="/telegram", tags=["telegram"])
     response_model=TelegramLinkResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit("5/minute")
 async def create_telegram_link(
-    db: db_dependency, user: User = Depends(get_current_user)
+    request: Request,
+    db: db_dependency,
+    user: User = Depends(get_current_user),
 ) -> TelegramLinkResponse:
 
     bot_username = settings.TELEGRAM_BOT_USERNAME

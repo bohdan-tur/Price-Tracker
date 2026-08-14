@@ -5,10 +5,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from aiogram.enums import ChatType
-from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.api.routers.telegram import create_telegram_link
+from app.api.dependencies import get_current_user
 from app.bot.application import (
     create_bot,
     create_dispatcher,
@@ -24,6 +23,7 @@ from app.bot.handlers import (
     router,
 )
 from app.core.config import settings
+from app.main import app
 from app.models.item import Item, ItemStatus
 from app.models.telegram_account import TelegramAccount
 
@@ -54,32 +54,37 @@ def make_session_factory(
 
 
 async def test_telegram_link_endpoint_returns_deep_link(
-    db_session,
+    async_client,
     create_test_user,
     monkeypatch,
 ):
     user = await create_test_user()
+    app.dependency_overrides[get_current_user] = lambda: user
     monkeypatch.setattr(settings, "TELEGRAM_POLLING_ENABLED", True)
     monkeypatch.setattr(settings, "TELEGRAM_BOT_USERNAME", "price_tracker_bot")
 
-    response = await create_telegram_link(db_session, user)
+    response = await async_client.post("/telegram/link")
 
-    assert str(response.deep_link).startswith("https://t.me/price_tracker_bot?start=")
-    assert response.expires_at is not None
+    assert response.status_code == 201
+    assert response.json()["deep_link"].startswith(
+        "https://t.me/price_tracker_bot?start="
+    )
+    assert response.json()["expires_at"] is not None
 
 
 async def test_telegram_link_endpoint_is_unavailable_when_polling_is_disabled(
-    db_session,
+    async_client,
     create_test_user,
     monkeypatch,
 ):
     user = await create_test_user()
+    app.dependency_overrides[get_current_user] = lambda: user
     monkeypatch.setattr(settings, "TELEGRAM_POLLING_ENABLED", False)
 
-    with pytest.raises(HTTPException) as exc_info:
-        await create_telegram_link(db_session, user)
+    response = await async_client.post("/telegram/link")
 
-    assert exc_info.value.status_code == 503
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Telegram integration is unavailable"
 
 
 async def test_start_handler_consumes_token_and_answers_successfully():

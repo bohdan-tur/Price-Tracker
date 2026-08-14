@@ -4,11 +4,14 @@ import time
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.api.routers import auth, health, item, telegram, user
 from app.bot.application import run_telegram_polling
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.core.rate_limit import limiter
 from app.database.seed import seed_database
 
 setup_logging()
@@ -45,6 +48,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Price Tracker", description="Price Tracker API", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 @app.middleware("http")

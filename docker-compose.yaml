@@ -8,6 +8,9 @@ x-runtime-env: &runtime-env
 x-database-env: &database-env
   DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
 
+x-rate-limit-env: &rate-limit-env
+  RATE_LIMIT_STORAGE_URI: ${RATE_LIMIT_STORAGE_URI:-redis://redis:6379/1}
+
 x-auth-env: &auth-env
   ACCESS_TOKEN_SECRET_KEY: ${ACCESS_TOKEN_SECRET_KEY:?ACCESS_TOKEN_SECRET_KEY is required}
   REFRESH_TOKEN_SECRET_KEY: ${REFRESH_TOKEN_SECRET_KEY:?REFRESH_TOKEN_SECRET_KEY is required}
@@ -62,7 +65,7 @@ services:
     build: .
     command: alembic upgrade head
     environment:
-      <<: [*runtime-env, *database-env, *auth-env, *scraper-env]
+      <<: [*runtime-env, *database-env, *rate-limit-env, *auth-env, *scraper-env]
     depends_on:
       db:
         condition: service_healthy
@@ -97,7 +100,7 @@ services:
     container_name: price_tracker_api
     restart: unless-stopped
     environment:
-      <<: [*runtime-env, *database-env, *auth-env, *scraper-env, *seed-env, *telegram-env]
+      <<: [*runtime-env, *database-env, *rate-limit-env, *auth-env, *scraper-env, *seed-env, *telegram-env]
     ports:
       - "8000:8000"
     volumes:
@@ -116,7 +119,7 @@ services:
     restart: unless-stopped
     command: celery -A app.worker.worker.celery_app worker --loglevel=info
     environment:
-      <<: [*runtime-env, *database-env, *auth-env, *scraper-env, *telegram-env]
+      <<: [*runtime-env, *database-env, *rate-limit-env, *auth-env, *scraper-env, *telegram-env]
     volumes:
       - .:/app
     depends_on:
@@ -131,7 +134,7 @@ services:
     restart: unless-stopped
     command: celery -A app.worker.worker.celery_app beat --loglevel=info
     environment:
-      <<: [*runtime-env, *database-env, *auth-env, *scraper-env]
+      <<: [*runtime-env, *database-env, *rate-limit-env, *auth-env, *scraper-env]
     volumes:
       - .:/app
     depends_on:
