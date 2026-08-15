@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from httpx import AsyncClient
 
@@ -23,6 +23,7 @@ async def test_readiness_probe_success(async_client: AsyncClient):
     assert data["status"] == "pass"
     assert "database" in data["checks"]
     assert data["checks"]["database"]["status"] == "pass"
+    assert data["checks"]["redis"]["status"] == "pass"
     assert (
         response.headers.get("cache-control") == "no-cache, no-store, must-revalidate"
     )
@@ -54,3 +55,19 @@ async def test_readiness_probe_db_timeout(async_client: AsyncClient):
         assert data["status"] == "fail"
         assert data["checks"]["database"]["status"] == "fail"
         assert "Query timed out" in data["checks"]["database"]["detail"]
+
+
+async def test_readiness_probe_redis_failure(async_client: AsyncClient):
+    with patch(
+        "app.api.routers.health.check_redis_connection",
+        new=AsyncMock(side_effect=ConnectionError("Redis unavailable")),
+    ):
+        response = await async_client.get("/health/ready")
+
+    assert response.status_code == 503
+    data = response.json()
+
+    assert data["status"] == "fail"
+    assert data["checks"]["database"]["status"] == "pass"
+    assert data["checks"]["redis"]["status"] == "fail"
+    assert "Redis unavailable" in data["checks"]["redis"]["detail"]
