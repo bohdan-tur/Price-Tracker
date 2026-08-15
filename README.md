@@ -1,252 +1,68 @@
-# 📈 Price Tracker
+# Price Tracker
 
-![Python](https://img.shields.io/badge/Python-3.13-blue?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.136.1-green?logo=fastapi&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue?logo=postgresql&logoColor=white)
-![Redis](https://img.shields.io/badge/Redis-7-red?logo=redis&logoColor=white)
-![Celery](https://img.shields.io/badge/Celery-5.4.0-brightgreen?logo=celery&logoColor=white)
-![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0.49-red?logo=sqlalchemy&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-Compose-blue?logo=docker&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.136.1-009688?logo=fastapi&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
+![Celery](https://img.shields.io/badge/Celery-5.4.0-37814A?logo=celery&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 
-A modern RESTful price tracking API built with FastAPI, PostgreSQL, Redis, and Celery. The project scrapes product prices from e-commerce websites, keeps a full price history, and uses an asynchronous architecture with background task processing, JWT-based authentication, and a fully containerized development workflow with Docker Compose.
+An asynchronous price-monitoring backend that tracks product prices, preserves their history, and sends Telegram alerts when a configured target price is reached.
 
-## 📚 Table of Contents
+The project combines a FastAPI REST API with scheduled Celery jobs, a hardened multi-strategy scraper, reliable notification delivery, and a provisioned Prometheus/Grafana monitoring stack.
 
-- [Overview](#-overview)
-- [Features](#-features)
-- [Tech Stack](#-tech-stack)
-- [Architecture](#-architecture)
-- [Project Structure](#-project-structure)
-- [Environment Variables](#️-environment-variables)
-- [Docker Services](#-docker-services)
-- [Getting Started](#-getting-started)
-- [Available Services](#-available-services)
-- [API Usage Example](#-api-usage-example)
-- [API Endpoints](#-api-endpoints)
-- [Database Seeding](#-database-seeding)
-- [Testing](#-testing)
-- [Background Tasks](#-background-tasks)
-- [Web Scraping Strategy](#-web-scraping-strategy)
-- [Security](#-security)
-- [Authentication](#-authentication)
-- [Author](#-author)
+## Highlights
 
-## 📋 Overview
+- Target-price tracking with a complete price history
+- Scheduled and independently retried price checks with Celery and Redis
+- Telegram account linking, bot commands, and price-drop notifications
+- SSRF-resistant scraping with domain allowlisting, redirect validation, and response-size limits
+- JWT authentication, Argon2 password hashing, and endpoint rate limiting
+- Idempotent notification events that prevent duplicate alerts
+- Liveness, readiness, HTTP metrics, Celery metrics, and a provisioned Grafana dashboard
+- Reproducible local environment built with Docker Compose and Alembic migrations
 
-Price Tracker is a backend application for monitoring product prices across e-commerce websites. It is designed as an asynchronous API service with a modular structure, background scraping jobs, and a multi-strategy price extraction engine.
+## Architecture
 
-The project includes:
+```mermaid
+flowchart LR
+    Client[API client] --> API[FastAPI]
+    TelegramUser[Telegram user] <--> Bot[Telegram bot]
 
-- JWT-based authentication with access and refresh tokens
-- Item tracking endpoints with automatic price scraping
-- Full price history per item
-- PostgreSQL integration with async SQLAlchemy
-- Redis-backed Celery task processing
-- Alembic database migrations
-- SSRF-protected web scraper
-- Admin panel for user management
+    API --> DB[(PostgreSQL)]
+    API --> Redis[(Redis)]
+    API --> Bot
 
-## ✨ Features
+    Beat[Celery Beat] --> Redis
+    Redis --> Worker[Celery Worker]
+    Worker --> Scraper[Hardened scraper]
+    Scraper --> Shops[E-commerce sites]
+    Worker --> DB
+    Worker --> Bot
 
-**🔐 JWT Authentication**
-- Access and refresh tokens
-- Configurable expiration settings
-- Token-based protected endpoints
-
-**🔒 Password Security**
-- Argon2 password hashing
-
-**📉 Price Tracking**
-- Add items by URL and target price
-- Automatic price scraping on item creation
-- Full price history stored per item
-
-**⏱ Background Automation**
-- Celery beat scheduler refreshes prices for all tracked items daily at 3 AM UTC
-- Celery worker executes the scheduled refresh jobs asynchronously
-
-**🛡 Admin Panel**
-- User listing, status control, and account management
-
-**🗄 Database Migrations**
-- Alembic-based schema versioning
-
-**🐳 Containerized Development**
-- Multi-service Docker Compose setup
-- Separate containers for API, database, Redis, and Celery
-
-## 🛠 Tech Stack
-
-### Backend
-- **Python 3.13**
-- **FastAPI 0.136.1**
-- **Pydantic** — data validation and settings management
-
-### Database & ORM
-- **PostgreSQL 15**
-- **SQLAlchemy 2.0.49** — asynchronous ORM
-- **asyncpg** — asynchronous PostgreSQL driver
-- **Alembic** — database migration management
-
-### Background Tasks & Caching
-- **Celery 5.4.0** — task queue for scheduled price updates
-- **Redis 7** — message broker and cache
-
-### Authentication & Security
-- **JWT (python-jose)** — access + refresh tokens
-- **Argon2** — password hashing
-
-### Web Scraping
-- **BeautifulSoup4, lxml, httpx** — scraping stack
-
-### Testing
-- **Pytest**, **pytest-asyncio**, **pytest-cov**
-
-### DevOps & Tooling
-- **Docker & Docker Compose**
-
-## 🏗 Architecture
-
-The project runs as a multi-container application and separates responsibilities across dedicated services.
-
-**Main services**
-- `api` — FastAPI application
-- `db` — main PostgreSQL database
-- `test_db` — isolated PostgreSQL database for tests
-- `redis` — broker/cache used by Celery
-- `celery_worker` — Celery worker executing scraping tasks
-- `celery_beat` — Celery beat scheduler for daily price updates
-
-**High-level flow**
-
-```
-Client
-  ↓
-FastAPI API
-  ├── PostgreSQL (users, items, price history)
-  ├── Redis (broker / cache)
-  └── Celery
-       ├── celery_worker (scrapes prices)
-       └── celery_beat (schedules daily updates)
+    Prometheus[Prometheus] --> API
+    Prometheus --> Flower[Flower]
+    Grafana[Grafana] --> Prometheus
+    Worker --> Flower
 ```
 
-## 📁 Project Structure
+The API owns users, tracked items, target prices, and Telegram account linking. Celery Beat periodically dispatches work through Redis; workers scrape each item independently, persist price changes, and deliver pending notifications. Prometheus collects HTTP and Celery metrics, while Grafana provides the operational dashboard.
 
-```
-price-tracker/
-├── app/
-│   ├── main.py                       # FastAPI application entry point
-│   ├── api/
-│   │   ├── dependencies.py           # Dependency injection (Auth)
-│   │   └── routers/
-│   │       ├── auth.py               # Authentication endpoints
-│   │       ├── health.py             # Health check endpoint
-│   │       ├── item.py               # Item CRUD operations
-│   │       └── user.py               # User management
-│   ├── core/
-│   │   ├── config.py                 # Settings management
-│   │   ├── logging.py                # Logging configuration
-│   │   └── security.py               # JWT & password hashing
-│   ├── database/
-│   │   ├── db.py                     # Database session management
-│   │   └── seed.py                   # Database seeding logic
-│   ├── models/
-│   │   ├── item.py                   # Item SQLAlchemy model
-│   │   ├── price_history.py          # Price history SQLAlchemy model
-│   │   └── user.py                   # User SQLAlchemy model
-│   ├── schemas/
-│   │   ├── health.py                 # Health check Pydantic schemas
-│   │   ├── item.py                   # Item Pydantic schemas
-│   │   ├── pagination.py            # Pagination Pydantic schemas
-│   │   ├── password_change.py        # Password change Pydantic schema
-│   │   ├── price_history.py          # Price history Pydantic schema
-│   │   ├── refresh_token.py          # Refresh token Pydantic schema
-│   │   └── user.py                   # User Pydantic schemas
-│   ├── services/
-│   │   └── scraper.py                # Core web scraping service
-│   └── worker/
-│       └── worker.py                 # Celery worker & beat tasks
-├── migration/
-│   ├── env.py                        # Alembic environment configuration
-│   └── versions/                     # Database migrations history
-├── tests/
-│   ├── conftest.py                   # Pytest fixtures
-│   ├── test_auth.py                  # Authentication tests
-│   ├── test_health.py                # Health check tests
-│   ├── test_items.py                 # Item CRUD tests
-│   ├── test_scraper.py               # Web scraper tests
-│   ├── test_users.py                 # User management tests
-│   └── test_worker.py                # Background worker tests
-├── .env.example                      # Environment variables example
-├── alembic.ini                       # Alembic configuration
-├── docker-compose.yaml               # Docker Compose infrastructure setup
-├── Dockerfile                        # Docker image
-├── pytest.ini                        # Pytest configuration
-└── requirements.txt                  # Python dependencies
-```
+## Tech Stack
 
-## ⚙️ Environment Variables
-
-Example configuration:
-
-```env
-# JWT
-ACCESS_TOKEN_SECRET_KEY=your_access_secret_key_change_this
-REFRESH_TOKEN_SECRET_KEY=your_refresh_secret_key_change_this
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRES_MINUTES=20
-REFRESH_TOKEN_EXPIRES_DAYS=14
-DEBUG=False
-
-# Database
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=your_secure_password
-POSTGRES_DB=price_tracker
-DATABASE_URL=postgresql+asyncpg://postgres:your_secure_password@db:5432/price_tracker
-SEED_ADMIN_PASSWORD=your_secure_admin_password_here
-SEED_USER_PASSWORD=your_secure_user_password_here
-
-# Test Database
-TEST_POSTGRES_USER=test_user
-TEST_POSTGRES_PASSWORD=test_password_secret
-TEST_POSTGRES_DB=test_price_tracker
-TEST_DATABASE_URL=postgresql+asyncpg://test_user:test_password_secret@db:5432/test_price_tracker
-
-# CORS
-CORS_ORIGINS='["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000"]'
-```
-
-**Key variables**
-
-| Variable | Description |
+| Area | Technologies |
 |---|---|
-| `DATABASE_URL` | Main PostgreSQL connection string |
-| `TEST_DATABASE_URL` | Database used during tests |
-| `ACCESS_TOKEN_SECRET_KEY` | Secret key for access tokens |
-| `REFRESH_TOKEN_SECRET_KEY` | Secret key for refresh tokens |
-| `ACCESS_TOKEN_EXPIRES_MINUTES` | Access token lifetime |
-| `REFRESH_TOKEN_EXPIRES_DAYS` | Refresh token lifetime |
-| `SEED_ADMIN_PASSWORD` | Password used for the seeded admin account |
-| `SEED_USER_PASSWORD` | Password used for the seeded test accounts |
-| `CORS_ORIGINS` | Comma-separated list of allowed origins |
-| `DEBUG` | Enables debug mode |
+| API | Python 3.13, FastAPI, Pydantic |
+| Persistence | PostgreSQL 15, async SQLAlchemy, asyncpg, Alembic |
+| Background processing | Celery, Redis, Celery Beat |
+| Scraping | HTTPX, Beautiful Soup, lxml |
+| Telegram | aiogram |
+| Security | JWT, Argon2, SlowAPI |
+| Observability | Prometheus, Grafana, Flower |
+| Testing | pytest, pytest-asyncio, pytest-cov |
+| Infrastructure | Docker, Docker Compose, GitHub Actions |
 
-## 🐳 Docker Services
-
-The application is designed to run using Docker Compose.
-
-| Service | Container Name | Port (host:container) | Purpose |
-|---|---|---|---|
-| `api` | `price_tracker_api` | `8000:8000` | FastAPI application |
-| `db` | — | `5433:5432` | Main PostgreSQL database |
-| `test_db` | — | `5434:5432` | Isolated PostgreSQL database for tests |
-| `redis` | `price_tracker_redis` | `6380:6379` | Redis broker / cache |
-| `celery_worker` | `price_tracker_worker` | — | Executes scraping tasks |
-| `celery_beat` | `price_tracker_beat` | — | Schedules the daily price update job |
-
-> **Note:** `db` and `test_db` are exposed on non-default host ports (`5433`, `5434`) to avoid clashing with a local PostgreSQL instance. Inside the Docker network, services still connect on the default port `5432`.
-
-## 🚀 Getting Started
+## Quick Start
 
 ### 1. Clone the repository
 
@@ -255,184 +71,198 @@ git clone https://github.com/bohdan-tur/price-tracker.git
 cd price-tracker
 ```
 
-### 2. Create the environment file
+### 2. Configure the environment
 
 ```bash
 cp .env.example .env
 ```
 
-Then update the `.env` file with your local configuration.
-
-### 3a. Run with Docker Compose (recommended)
+Run the following command twice to generate different JWT secrets containing at least 32 bytes each. Then set the required database, scraper, and Grafana values in `.env`. Telegram credentials are optional unless polling is enabled.
 
 ```bash
-docker-compose up --build
+python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-### 3b. Manual setup
+The complete configuration template and safe development defaults are documented in [`.env.example`](.env.example).
+
+### 3. Start the stack
 
 ```bash
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+docker compose up --build -d
 ```
 
-### 4. Check service status
+Database migrations run automatically before the API starts.
+
+### 4. Verify the deployment
 
 ```bash
-docker-compose ps
+docker compose ps
+curl http://localhost:8000/health/ready
 ```
 
-## 🌐 Available Services
+## Docker Services
 
-Once the application is running, the following endpoints should be available:
+| Service | URL / port | Purpose |
+|---|---|---|
+| FastAPI | [localhost:8000/docs](http://localhost:8000/docs) | REST API and Swagger UI |
+| PostgreSQL | `localhost:5433` | Application database |
+| Redis | `localhost:6380` | Celery broker and rate-limit storage |
+| Flower | [localhost:5555](http://localhost:5555) | Celery worker and task monitoring |
+| Prometheus | [localhost:9090](http://localhost:9090) | Metrics collection and querying |
+| Grafana | [localhost:3000](http://localhost:3000) | Provisioned observability dashboard |
 
-| Service | URL |
-|---|---|
-| Swagger UI | http://localhost:8000/docs |
-| ReDoc | http://localhost:8000/redoc |
-| PostgreSQL (main) | localhost:5433 |
-| PostgreSQL (test) | localhost:5434 |
-| Redis | localhost:6380 |
+The `migrations` service applies Alembic migrations and exits. The isolated PostgreSQL test database is only started through the `test` profile:
 
-## 💻 API Usage Example
+```bash
+docker compose --profile test up -d test_db
+```
 
-**Track a new item**
+## Tracking Flow
 
-**Request**
+Create an authenticated tracking request with a URL from the configured domain allowlist:
 
 ```http
 POST /items/
+Authorization: Bearer <access-token>
+Content-Type: application/json
 ```
 
 ```json
 {
-  "title": "Awesome Laptop Pro 2026",
-  "url": "https://example-shop.com/product/awesome-laptop"
+  "title": "Example product",
+  "url": "https://rozetka.com.ua/example-product/",
+  "target_price": "25000.00"
 }
 ```
 
-**Response — 201 Created**
+The API validates the URL, stores the item with a `pending` status, and dispatches an independent Celery task. The worker then fetches the page, extracts the price, records the price history, and updates the item to `active` or `failed`. Subsequent checks are scheduled by Celery Beat.
 
-```json
-{
-  "id": 1,
-  "title": "Awesome Laptop Pro 2026",
-  "url": "https://example-shop.com/product/awesome-laptop",
-  "current_price": 1050.00,
-  "user_id": 5,
-  "price_histories": []
-}
-```
+## API Endpoints
 
-> **Note:** The price is fetched **synchronously** on item creation  so `current_price` is already populated in the response. The Celery beat scheduler only handles subsequent, periodic price refreshes (daily at 3 AM UTC) — it does not populate the initial price.
+The complete interactive contract is available through Swagger UI at [`/docs`](http://localhost:8000/docs).
 
-## 🔌 API Endpoints
-
-**Auth**
-
-| Method | Endpoint | Description |
+| Method | Endpoint | Purpose |
 |---|---|---|
-| POST | `/auth/register` | User registration |
-| POST | `/auth/login` | User login |
-| POST | `/auth/refresh_token` | Refresh access token |
+| `POST` | `/auth/register` | Register a user |
+| `POST` | `/auth/login` | Issue access and refresh tokens |
+| `POST` | `/auth/refresh_token` | Issue a new access token |
+| `GET` | `/users/me` | Read the current profile |
+| `PATCH` | `/users/me/password` | Change the current password |
+| `DELETE` | `/users/me` | Deactivate the current account |
+| `POST` | `/items/` | Create a tracked item and enqueue its first check |
+| `GET` | `/items/` | List the current user's items |
+| `GET` | `/items/{item_id}/history` | Read an item's price history |
+| `DELETE` | `/items/{item_id}` | Delete a tracked item |
+| `POST` | `/telegram/link` | Create a one-time Telegram linking URL |
+| `GET` | `/health/live` | Check whether the API process is running |
+| `GET` | `/health/ready` | Check PostgreSQL and Redis readiness |
+| `GET` | `/metrics` | Expose Prometheus HTTP metrics |
 
-**User Management**
+Administrative user-management endpoints are also available to superusers and documented in Swagger UI.
 
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/users/me` | Get current user profile |
-| PATCH | `/users/me/password` | Change password |
-| DELETE | `/users/me/` | Deactivate account |
-| GET | `/users/` | List all users (Admin only) |
-| GET | `/users/{user_id}` | Get user by ID (Admin only) |
-| PATCH | `/users/{user_id}/deactivate` | Deactivate user (Admin only) |
-| PATCH | `/users/{user_id}/activate` | Activate user (Admin only) |
-| DELETE | `/users/{user_id}` | Delete user (Admin only) |
+## Telegram Alerts
 
-**Items & Tracking**
+To enable the integration, create a bot through BotFather and configure `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, and `TELEGRAM_POLLING_ENABLED=true`.
 
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/items/` | Create a new tracked item |
-| GET | `/items/` | List user's tracked items |
-| DELETE | `/items/{item_id}` | Delete an item |
+Linking uses a short-lived, single-use token:
 
-**System**
+1. An authenticated user calls `POST /telegram/link`.
+2. The API returns a `t.me` deep link with an expiring token.
+3. The user opens the link and starts the bot in a private chat.
+4. The bot consumes the token and associates that Telegram account with the Price Tracker user.
 
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/health/live` | Liveness probe |
-| GET | `/health/ready` | Readiness probe |
+The bot supports `/help`, `/list`, `/status`, and `/unlink`. When an active item reaches its target price, notification delivery is queued in Celery and tracked through an idempotent notification event.
 
-## 🗄 Database Seeding
+## Observability
 
-Database seeding is **automatic** — it runs during application startup in the `lifespan` function of `main.py`.
+The monitoring stack is provisioned automatically with Docker Compose:
 
-This creates the following test accounts:
+- FastAPI exposes HTTP request count and latency metrics at `/metrics`.
+- Flower exposes Celery worker and task metrics.
+- Prometheus collects both metric sources.
+- Grafana loads the Prometheus datasource and the Price Tracker dashboard at startup.
 
-- `admin@price-tracker.com` (Superuser)
+The dashboard covers HTTP request rate, p95 latency, 5xx rate, responses by status class, online Celery workers, task throughput, and p95 task runtime.
+
+![Price Tracker API and Celery observability dashboard](docs/images/observability-dashboard.png)
+
+_Provisioned Grafana dashboard during a controlled local load run._
+
+### Controlled Local Load Run
+
+The stack was verified with a short local run intended to validate metric collection and dashboard behavior, not to represent production capacity.
+
+| Measurement | Result |
+|---|---:|
+| HTTP requests | 1,162 in 30 seconds |
+| Concurrent clients | 5 |
+| HTTP request failures | 0 |
+| Average HTTP throughput during the run | ~39 requests/second |
+| HTTP p95 latency | 95 ms |
+| HTTP 5xx rate | 0% |
+| Celery test tasks | 30 dispatched, 30 succeeded |
+| Celery p95 task runtime | ~234 ms |
+
+The load generator's throughput is calculated over the 30-second run, while the dashboard request-rate panels use rolling Prometheus windows; their displayed values therefore differ. Results are environment-dependent and are included as an observability smoke test rather than a performance guarantee.
+
+## Database Seeding
+
+Development seed data is disabled by default. Set `SEED_DEFAULT_USERS=true` together with `SEED_ADMIN_PASSWORD` and `SEED_USER_PASSWORD` to create one superuser and two regular demo users during API startup:
+
+- `admin@price-tracker.com`
 - `user4@example.com`
 - `user5@example.com`
 
-## 🧪 Testing
+Seeding is rejected in production. Existing users are left unchanged, so enabling it repeatedly does not overwrite their passwords or account state.
 
-**Run tests**
+## Testing
+
+Start the isolated test database and run the suite inside the application image:
 
 ```bash
-pytest tests/
+docker compose --profile test up -d test_db
+docker compose --profile test run --rm --env-from-file .env \
+  -e ENVIRONMENT=test api python -m pytest tests -v
 ```
 
-## 📬 Background Tasks
+Run the same suite with a terminal coverage report:
 
-Background processing is handled with Celery and Redis.
-
-**Included services**
-- `celery_worker` — executes the scheduled price-refresh job
-- `celery_beat` — schedules the daily refresh job (3 AM UTC)
-
-**Typical use cases for background tasks include:**
-- Refreshing prices for all tracked items on a daily schedule
-
-> Note: the price shown right after creating an item is **not** fetched by Celery — it's fetched synchronously in the request itself, before the response is returned.
-
-## 🕷 Web Scraping Strategy
-
-The application uses a robust, multi-strategy approach to extract prices from various e-commerce platforms:
-
-1. **JSON-LD Structured Data** — extracts clean, structured product data directly from page metadata
-2. **Meta Tags** — scans for standard e-commerce tags (e.g. `product:price:amount`)
-3. **CSS Selectors** — fallback extraction using common commerce classes (e.g. `.product_price_current`, `.price--current`)
-
-## 🔒 Security
-
-- **SSRF Protection** — secures the web scraper against Server-Side Request Forgery attacks
-- **Argon2 Hashing** — state-of-the-art password hashing
-- **URL Validation** — strict validation of targets before initiating any scraping requests
-- **CORS Configuration** — secure cross-origin resource sharing middleware
-
-## 🔐 Authentication
-
-The application uses JWT-based authentication with separate settings for access and refresh tokens.
-
-**Authentication configuration**
-
-```env
-ALGORITHM=HS256
-ACCESS_TOKEN_SECRET_KEY=your_access_secret_key_change_this
-REFRESH_TOKEN_SECRET_KEY=your_refresh_secret_key_change_this
-ACCESS_TOKEN_EXPIRES_MINUTES=20
-REFRESH_TOKEN_EXPIRES_DAYS=14
+```bash
+docker compose --profile test run --rm --env-from-file .env \
+  -e ENVIRONMENT=test api python -m pytest tests --cov=app --cov-report=term-missing
 ```
 
-**Supported token types**
-- **Access token** — short-lived token for protected requests
-- **Refresh token** — longer-lived token used to issue a new access token
+GitHub Actions validates the Compose configuration, builds the API image, starts isolated infrastructure, and runs the test suite on every configured push and pull request.
 
-Passwords are hashed using Argon2.
+## Background Processing
 
-## 👤 Author
+Celery tasks keep long-running and retryable work outside HTTP requests:
 
-[Bohdan Turevych](https://www.linkedin.com/in/bohdan-turevych)
+- a newly created item immediately dispatches its first independent price check;
+- Celery Beat dispatches checks for tracked items every day at `03:00 UTC`;
+- pending Telegram notifications are dispatched every minute;
+- transient Telegram delivery errors use bounded retries and backoff.
 
-* GitHub: [@bohdan-tur](https://github.com/bohdan-tur)
-* LinkedIn: [Bohdan Turevych](https://www.linkedin.com/in/bohdan-turevych)
+Each item is processed separately, so a failed site or malformed product page does not stop checks for the remaining items.
+
+## Scraping and Security
+
+Price extraction follows a fallback pipeline: JSON-LD structured data, product-price metadata, and finally common CSS selectors.
+
+The surrounding controls are as important as extraction itself:
+
+- domain allowlisting and URL-length validation;
+- DNS resolution checks that reject private, loopback, link-local, and other non-global targets;
+- redirect revalidation to prevent allowlist bypasses;
+- streamed response-size enforcement;
+- separate JWT secrets for access and refresh tokens;
+- Argon2 password hashing through `pwdlib`;
+- Redis-backed rate limits on authentication, item creation, and Telegram linking;
+- ownership checks for user-scoped items and price history.
+
+## Author
+
+**Bohdan Turevych**
+
+- GitHub: [@bohdan-tur](https://github.com/bohdan-tur)
+- LinkedIn: [Bohdan Turevych](https://www.linkedin.com/in/bohdan-turevych)
