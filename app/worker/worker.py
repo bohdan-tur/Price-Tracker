@@ -81,6 +81,8 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     broker_connection_retry_on_startup=True,
+    worker_send_task_events=True,
+    task_send_sent_event=True,
 )
 
 
