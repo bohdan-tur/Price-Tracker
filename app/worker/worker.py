@@ -41,7 +41,7 @@ def get_worker_session_factory() -> async_sessionmaker[AsyncSession]:
     if _worker_session_factory is None:
         engine = create_async_engine(
             settings.DATABASE_URL,
-            echo=settings.DEBUG,
+            echo=settings.APP_DEBUG,
             poolclass=NullPool,
         )
         _worker_session_factory = async_sessionmaker(
@@ -81,6 +81,8 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     broker_connection_retry_on_startup=True,
+    worker_send_task_events=True,
+    task_send_sent_event=True,
 )
 
 

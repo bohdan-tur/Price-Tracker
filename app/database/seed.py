@@ -40,7 +40,7 @@ async def seed_database() -> None:
     if settings.ENVIRONMENT is Environment.PRODUCTION:
         raise RuntimeError("Default users cannot be seeded in production")
 
-    engine = create_async_engine(settings.DATABASE_URL, echo=settings.DEBUG)
+    engine = create_async_engine(settings.DATABASE_URL, echo=settings.APP_DEBUG)
     async_session = async_sessionmaker(
         engine, class_=AsyncSession, expire_on_commit=False
     )

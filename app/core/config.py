@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_USERNAME: str | None = None
     TELEGRAM_POLLING_ENABLED: bool = False
 
-    DEBUG: bool = False
+    APP_DEBUG: bool = False
 
     SEED_DEFAULT_USERS: bool = False
     SEED_ADMIN_PASSWORD: str | None = None
@@ -103,8 +103,8 @@ class Settings(BaseSettings):
             )
 
         if self.ENVIRONMENT is Environment.PRODUCTION:
-            if self.DEBUG:
-                raise ValueError("DEBUG must be false in production")
+            if self.APP_DEBUG:
+                raise ValueError("APP_DEBUG must be false in production")
             if self.SEED_DEFAULT_USERS:
                 raise ValueError("Default users cannot be seeded in production")
 

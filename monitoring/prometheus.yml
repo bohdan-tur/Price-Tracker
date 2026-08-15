@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: price_tracker_api
+    static_configs:
+      - targets: ["api:8000"]
+
+  - job_name: celery_flower
+    static_configs:
+      - targets: ["flower:5555"]
