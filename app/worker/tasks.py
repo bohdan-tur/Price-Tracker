@@ -7,8 +7,6 @@ from aiogram.exceptions import (
     TelegramRetryAfter,
     TelegramServerError,
 )
-from celery import Celery
-from celery.schedules import crontab
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -26,6 +24,7 @@ from app.services.scraper import get_current_price
 from app.services.telegram_notification_service import (
     deliver_telegram_notification as deliver_telegram_notification_service,
 )
+from app.worker.celery_app import celery_app
 
 logger = logging.getLogger("root")
 
@@ -68,22 +67,6 @@ async def deliver_telegram_notification_async(
         )
     finally:
         await bot.session.close()
-
-
-celery_app = Celery(
-    "price_tracker", broker="redis://redis:6379/0", backend="redis://redis:6379/0"
-)
-
-celery_app.conf.update(
-    task_serializer="json",
-    accept_content=["json"],
-    result_serializer="json",
-    timezone="UTC",
-    enable_utc=True,
-    broker_connection_retry_on_startup=True,
-    worker_send_task_events=True,
-    task_send_sent_event=True,
-)
 
 
 async def scrape_item_async(
@@ -262,18 +245,6 @@ def dispatch_price_checks() -> dict:
         scrape_item.delay(item_id)
 
     return {"status": "success", "dispatched_items": len(item_ids)}
-
-
-celery_app.conf.beat_schedule = {
-    "update-prices-daily": {
-        "task": "dispatch_price_checks",
-        "schedule": crontab(hour=3, minute=0),
-    },
-    "dispatch-pending-telegram-notifications": {
-        "task": "dispatch_pending_telegram_notifications",
-        "schedule": crontab(minute="*"),
-    },
-}
 
 
 @celery_app.task(

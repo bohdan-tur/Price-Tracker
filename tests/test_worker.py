@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.models.item import Item, ItemStatus
 from app.models.notification_event import DeliveryStatus, NotificationEvent
 from app.models.price_history import PriceHistory
-from app.worker.worker import (
+from app.worker.tasks import (
     dispatch_pending_telegram_notifications,
     dispatch_price_checks,
     get_pending_notification_event_ids,
@@ -43,11 +43,11 @@ async def test_scrape_item_stores_first_price_without_notification(
 
     with (
         patch(
-            "app.worker.worker.get_current_price",
+            "app.worker.tasks.get_current_price",
             new=AsyncMock(return_value=Decimal("900.00")),
         ),
         patch(
-            "app.worker.worker.deliver_telegram_notification_task.delay"
+            "app.worker.tasks.deliver_telegram_notification_task.delay"
         ) as enqueue_notification,
     ):
         result = await scrape_item_async(item.id, make_session_factory(db_session))
@@ -97,7 +97,7 @@ async def test_scrape_item_does_not_duplicate_unchanged_price(
     await db_session.refresh(item)
 
     with patch(
-        "app.worker.worker.get_current_price",
+        "app.worker.tasks.get_current_price",
         new=AsyncMock(return_value=Decimal("1200.00")),
     ):
         result = await scrape_item_async(item.id, make_session_factory(db_session))
@@ -132,11 +132,11 @@ async def test_scrape_item_creates_notification_when_target_is_crossed(
 
     with (
         patch(
-            "app.worker.worker.get_current_price",
+            "app.worker.tasks.get_current_price",
             new=AsyncMock(return_value=Decimal("900.00")),
         ),
         patch(
-            "app.worker.worker.deliver_telegram_notification_task.delay"
+            "app.worker.tasks.deliver_telegram_notification_task.delay"
         ) as enqueue_notification,
     ):
         result = await scrape_item_async(item.id, make_session_factory(db_session))
@@ -172,7 +172,7 @@ async def test_scrape_item_marks_item_as_error_without_leaking_message(
     await db_session.refresh(item)
 
     with patch(
-        "app.worker.worker.get_current_price",
+        "app.worker.tasks.get_current_price",
         new=AsyncMock(side_effect=RuntimeError("sensitive upstream response")),
     ):
         result = await scrape_item_async(item.id, make_session_factory(db_session))
@@ -189,7 +189,7 @@ async def test_scrape_item_marks_item_as_error_without_leaking_message(
 async def test_scrape_item_returns_not_found_before_network_call(db_session):
     get_price = AsyncMock()
 
-    with patch("app.worker.worker.get_current_price", new=get_price):
+    with patch("app.worker.tasks.get_current_price", new=get_price):
         result = await scrape_item_async(999_999, make_session_factory(db_session))
 
     assert result == {"status": "not_found", "item_id": 999_999}
@@ -199,10 +199,10 @@ async def test_scrape_item_returns_not_found_before_network_call(db_session):
 def test_dispatch_price_checks_enqueues_one_task_per_item():
     with (
         patch(
-            "app.worker.worker.get_trackable_item_ids",
+            "app.worker.tasks.get_trackable_item_ids",
             new=AsyncMock(return_value=[10, 20, 30]),
         ),
-        patch("app.worker.worker.scrape_item.delay") as enqueue_scrape,
+        patch("app.worker.tasks.scrape_item.delay") as enqueue_scrape,
     ):
         result = dispatch_price_checks()
 
@@ -296,11 +296,11 @@ async def test_pending_notification_query_recovers_stale_processing_event(
 def test_pending_notification_dispatcher_enqueues_each_event():
     with (
         patch(
-            "app.worker.worker.get_pending_notification_event_ids",
+            "app.worker.tasks.get_pending_notification_event_ids",
             new=AsyncMock(return_value=[11, 22]),
         ),
         patch(
-            "app.worker.worker.deliver_telegram_notification_task.delay"
+            "app.worker.tasks.deliver_telegram_notification_task.delay"
         ) as enqueue_notification,
     ):
         result = dispatch_pending_telegram_notifications()
