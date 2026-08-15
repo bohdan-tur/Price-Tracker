@@ -10,7 +10,7 @@ from app.schemas.item import ItemCreate, ItemResponse
 from app.schemas.pagination import PaginationParams, get_pagination
 from app.schemas.price_history import PriceHistoryResponse
 from app.services.scraper import UnsafeScraperURLError, validate_scraper_url
-from app.worker.worker import scrape_item
+from app.worker.tasks import scrape_item
 
 router = APIRouter(prefix="/items", tags=["items"])
 

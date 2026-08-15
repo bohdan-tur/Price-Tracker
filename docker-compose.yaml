@@ -117,7 +117,7 @@ services:
     build: .
     container_name: price_tracker_worker
     restart: unless-stopped
-    command: celery -A app.worker.worker.celery_app worker --loglevel=info
+    command: celery -A app.worker.celery_app.celery_app worker --loglevel=info
     environment:
       <<: [*runtime-env, *database-env, *rate-limit-env, *auth-env, *scraper-env, *telegram-env]
     volumes:
@@ -132,7 +132,7 @@ services:
     build: .
     container_name: price_tracker_beat
     restart: unless-stopped
-    command: celery -A app.worker.worker.celery_app beat --loglevel=info
+    command: celery -A app.worker.celery_app.celery_app beat --loglevel=info
     environment:
       <<: [*runtime-env, *database-env, *rate-limit-env, *auth-env, *scraper-env]
     volumes:
@@ -148,7 +148,7 @@ services:
   flower:
     build: .
     container_name: price_tracker_flower
-    command: celery -A app.worker.worker.celery_app flower --port=5555
+    command: celery -A app.worker.celery_app.celery_app flower --port=5555
     environment:
       <<: [*runtime-env, *database-env, *rate-limit-env, *auth-env, *scraper-env]
     ports:
