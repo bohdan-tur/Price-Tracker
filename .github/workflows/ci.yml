@@ -16,7 +16,8 @@ jobs:
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRES_MINUTES: "20"
       REFRESH_TOKEN_EXPIRES_DAYS: "14"
-      DEBUG: "false"
+      APP_DEBUG: "false"
+      GRAFANA_ADMIN_PASSWORD: ci_only_grafana_password
       SEED_DEFAULT_USERS: "false"
       SCRAPER_ALLOWED_DOMAINS: '["rozetka.com.ua"]'
       SCRAPER_MAX_RESPONSE_BYTES: "2097152"
