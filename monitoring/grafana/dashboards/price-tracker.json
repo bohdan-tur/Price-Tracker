@@ -22,6 +22,21 @@
   "links": [],
   "panels": [
     {
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 8,
+      "options": {
+        "content": "# Price Tracker — API & Worker Observability",
+        "mode": "markdown"
+      },
+      "transparent": true,
+      "type": "text"
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -51,7 +66,7 @@
         "h": 5,
         "w": 6,
         "x": 0,
-        "y": 0
+        "y": 2
       },
       "id": 1,
       "options": {
@@ -119,7 +134,7 @@
         "h": 5,
         "w": 6,
         "x": 6,
-        "y": 0
+        "y": 2
       },
       "id": 2,
       "options": {
@@ -187,7 +202,7 @@
         "h": 5,
         "w": 6,
         "x": 12,
-        "y": 0
+        "y": 2
       },
       "id": 3,
       "options": {
@@ -251,7 +266,7 @@
         "h": 5,
         "w": 6,
         "x": 18,
-        "y": 0
+        "y": 2
       },
       "id": 4,
       "options": {
@@ -339,7 +354,7 @@
         "h": 10,
         "w": 8,
         "x": 0,
-        "y": 5
+        "y": 7
       },
       "id": 5,
       "options": {
@@ -427,7 +442,7 @@
         "h": 10,
         "w": 8,
         "x": 8,
-        "y": 5
+        "y": 7
       },
       "id": 6,
       "options": {
@@ -515,7 +530,7 @@
         "h": 10,
         "w": 8,
         "x": 16,
-        "y": 5
+        "y": 7
       },
       "id": 7,
       "options": {
