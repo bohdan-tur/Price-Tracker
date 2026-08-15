@@ -3,7 +3,7 @@ x-runtime-env: &runtime-env
   PYTHONPATH: /app
   PYTHONUNBUFFERED: "1"
   ENVIRONMENT: ${ENVIRONMENT:-development}
-  DEBUG: ${DEBUG:-false}
+  APP_DEBUG: ${APP_DEBUG:-false}
 
 x-database-env: &database-env
   DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}

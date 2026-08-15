@@ -41,7 +41,7 @@ def get_worker_session_factory() -> async_sessionmaker[AsyncSession]:
     if _worker_session_factory is None:
         engine = create_async_engine(
             settings.DATABASE_URL,
-            echo=settings.DEBUG,
+            echo=settings.APP_DEBUG,
             poolclass=NullPool,
         )
         _worker_session_factory = async_sessionmaker(
