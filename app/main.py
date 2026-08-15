@@ -4,6 +4,7 @@ import time
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
+from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -73,3 +74,11 @@ app.include_router(user.router)
 app.include_router(item.router)
 app.include_router(telegram.router)
 app.include_router(health.router)
+
+Instrumentator(
+    excluded_handlers=[
+        r"^/metrics$",
+        r"^/health/live$",
+        r"^/health/ready$",
+    ],
+).instrument(app).expose(app, include_in_schema=False)
