@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: Price Tracker
+    orgId: 1
+    folder: Price Tracker
+    type: file
+    disableDeletion: true
+    editable: false
+    options:
+      path: /var/lib/grafana/dashboards
