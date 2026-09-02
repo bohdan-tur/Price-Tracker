@@ -15,6 +15,7 @@ __pycache__/
 .idea/
 
 .pytest_cache/
+pytest-cache-files-*
 
 .coverage
 
@@ -24,13 +25,9 @@ htmlcov/
 
 Thumbs.db
 
-
-
 logs/*.log
 
 *.log
-
-
 
 celerybeat-schedule*
 
