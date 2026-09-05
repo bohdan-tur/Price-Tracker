@@ -24,7 +24,8 @@ FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/opt/venv/bin:$PATH"
+    PATH="/opt/venv/bin:$PATH" \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 RUN groupadd -r appuser && \
     useradd -r -g appuser -m -d /home/appuser appuser
@@ -38,6 +39,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
+
+RUN python -m playwright install --with-deps chromium && \
+    chown -R appuser:appuser /ms-playwright && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY --chown=appuser:appuser . .
 
 USER appuser
