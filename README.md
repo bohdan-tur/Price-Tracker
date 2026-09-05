@@ -21,6 +21,8 @@ stack.
 - Telegram account linking, bot commands, and idempotent price-drop alerts.
 - SSRF-resistant scraping with domain allowlisting, DNS and redirect
   validation, and response-size limits.
+- Selective Playwright fallback for JavaScript-rendered product pages while
+  static storefronts continue to use lightweight HTTP requests.
 - JWT authentication, Argon2 password hashing, ownership checks, and
   Redis-backed rate limiting.
 - Prometheus metrics for HTTP and Celery workloads with a provisioned Grafana
@@ -40,8 +42,11 @@ flowchart LR
 
     Beat[Celery Beat] --> Redis
     Redis --> Worker[Celery worker]
-    Worker --> Scraper[Defensive scraper]
-    Scraper --> Shops[E-commerce sites]
+    Worker --> Scraper[Scraping pipeline]
+    Scraper --> HTTPX[HTTPX]
+    Scraper --> Browser[Playwright / Chromium]
+    HTTPX --> Shops[E-commerce sites]
+    Browser --> Shops
     Worker --> DB
     Worker --> Bot
 
@@ -64,7 +69,7 @@ behavior.
 | API | Python 3.13, FastAPI, Pydantic v2, Uvicorn |
 | Persistence | PostgreSQL 15, SQLAlchemy 2 async, asyncpg, Alembic |
 | Background processing | Celery, Redis, Celery Beat |
-| Scraping | HTTPX, Beautiful Soup, lxml |
+| Scraping | HTTPX, Playwright, Chromium, Beautiful Soup, lxml |
 | Telegram | aiogram |
 | Security | JWT, Argon2, SlowAPI |
 | Observability | Prometheus, Grafana, Flower |
@@ -205,6 +210,14 @@ not stop checks for the remaining items.
 Price extraction uses a fallback pipeline: JSON-LD structured data,
 product-price metadata, and common CSS selectors. The surrounding controls are
 equally important:
+
+Static storefronts are fetched with HTTPX. Storefronts that render product data
+with JavaScript can be routed selectively through headless Chromium using
+Playwright. The browser waits for product JSON-LD, returns only the relevant
+structured-data fragments, and reuses the same extraction pipeline as the HTTP
+path. Browser scraping is controlled by an environment feature flag, runs as a
+non-root user in Docker, and uses limited worker concurrency to control memory
+usage.
 
 - domain allowlisting and URL-length validation;
 - DNS checks that reject private, loopback, link-local, and other non-global
