@@ -23,6 +23,9 @@ x-scraper-env: &scraper-env
   SCRAPER_MAX_RESPONSE_BYTES: ${SCRAPER_MAX_RESPONSE_BYTES:-2097152}
   SCRAPER_MAX_URL_LENGTH: ${SCRAPER_MAX_URL_LENGTH:-2048}
 
+x-browser-scraper-env: &browser-scraper-env
+  BROWSER_SCRAPING_ENABLED: ${BROWSER_SCRAPING_ENABLED:-false}
+  BROWSER_SCRAPING_TIMEOUT_SECONDS: ${BROWSER_SCRAPING_TIMEOUT_SECONDS:-30}
 x-seed-env: &seed-env
   SEED_DEFAULT_USERS: ${SEED_DEFAULT_USERS:-false}
   SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
@@ -117,9 +120,9 @@ services:
     build: .
     container_name: price_tracker_worker
     restart: unless-stopped
-    command: celery -A app.worker.celery_app.celery_app worker --loglevel=info
+    command: celery -A app.worker.celery_app.celery_app worker --loglevel=info --concurrency=1
     environment:
-      <<: [*runtime-env, *database-env, *rate-limit-env, *auth-env, *scraper-env, *telegram-env]
+      <<: [*runtime-env, *database-env, *rate-limit-env, *auth-env, *scraper-env, *browser-scraper-env, *telegram-env]
     volumes:
       - .:/app
     depends_on:

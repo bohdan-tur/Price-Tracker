@@ -1,11 +1,13 @@
 import asyncio
 import socket
 from decimal import Decimal
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
 
 from app.core.config import settings
+from app.services.browser_scraper import BrowserScraperError
 from app.services.scraper import (
     ScraperResponseError,
     UnsafeScraperURLError,
@@ -75,6 +77,60 @@ async def test_get_current_price_network_error(httpx_mock, public_dns):
     price = await get_current_price("https://rozetka.com.ua/fake_item/")
 
     assert price is None
+
+
+async def test_get_current_price_uses_browser_for_sinsay(
+    monkeypatch,
+    public_dns,
+    httpx_mock,
+):
+    url = "https://www.sinsay.com/ua/uk/product"
+    rendered_html = b"""
+    <script type="application/ld+json">
+        {
+            "@type": "Product",
+            "offers": {"price": "109.00"}
+        }
+    </script>
+    """
+    browser_scrape = AsyncMock(return_value=rendered_html)
+
+    monkeypatch.setattr(settings, "BROWSER_SCRAPING_ENABLED", True)
+    monkeypatch.setattr(settings, "SCRAPER_ALLOWED_DOMAINS", ["sinsay.com"])
+    monkeypatch.setattr(
+        "app.services.scraper.fetch_rendered_html",
+        browser_scrape,
+    )
+
+    price = await get_current_price(url)
+
+    assert price == Decimal("109.00")
+    browser_scrape.assert_awaited_once_with(url)
+    assert httpx_mock.get_requests() == []
+
+
+async def test_get_current_price_handles_browser_error(
+    monkeypatch,
+    public_dns,
+    httpx_mock,
+):
+    url = "https://www.sinsay.com/ua/uk/product"
+    browser_scrape = AsyncMock(
+        side_effect=BrowserScraperError("Browser scraping failed")
+    )
+
+    monkeypatch.setattr(settings, "BROWSER_SCRAPING_ENABLED", True)
+    monkeypatch.setattr(settings, "SCRAPER_ALLOWED_DOMAINS", ["sinsay.com"])
+    monkeypatch.setattr(
+        "app.services.scraper.fetch_rendered_html",
+        browser_scrape,
+    )
+
+    price = await get_current_price(url)
+
+    assert price is None
+    browser_scrape.assert_awaited_once_with(url)
+    assert httpx_mock.get_requests() == []
 
 
 @pytest.mark.parametrize(
