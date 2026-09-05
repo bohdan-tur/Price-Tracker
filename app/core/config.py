@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     SEED_ADMIN_PASSWORD: str | None = None
     SEED_USER_PASSWORD: str | None = None
 
+    BROWSER_SCRAPING_ENABLED: bool = False
+    BROWSER_SCRAPING_TIMEOUT_SECONDS: int = Field(default=30, ge=5, le=60)
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

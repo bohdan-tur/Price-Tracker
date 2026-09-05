@@ -13,9 +13,20 @@ import idna
 from bs4 import BeautifulSoup
 
 from app.core.config import settings
+from app.services.browser_scraper import (
+    BrowserScraperError,
+    fetch_rendered_html,
+)
 
 logger = logging.getLogger("root")
 logging.getLogger("httpx").setLevel(logging.WARNING)
+
+
+def _requires_browser_scraping(hostname: str) -> bool:
+    return settings.BROWSER_SCRAPING_ENABLED and (
+        hostname == "sinsay.com" or hostname.endswith(".sinsay.com")
+    )
+
 
 COMMON_SELECTORS = [
     ".product_price_current",
@@ -272,7 +283,6 @@ def _extract_price(html: bytes) -> Decimal | None:
 
 
 async def get_current_price(url: str) -> Decimal | None:
-
     target = await validate_scraper_url(url)
 
     headers = {
@@ -298,19 +308,22 @@ async def get_current_price(url: str) -> Decimal | None:
     )
 
     try:
-        async with httpx.AsyncClient(
-            headers=headers,
-            timeout=timeout,
-            limits=limits,
-            follow_redirects=False,
-            trust_env=False,
-        ) as client:
-            async with client.stream("GET", target.url) as response:
-                response.raise_for_status()
+        if _requires_browser_scraping(target.hostname):
+            body = await fetch_rendered_html(target.url)
+        else:
+            async with httpx.AsyncClient(
+                headers=headers,
+                timeout=timeout,
+                limits=limits,
+                follow_redirects=False,
+                trust_env=False,
+            ) as client:
+                async with client.stream("GET", target.url) as response:
+                    response.raise_for_status()
 
-                body = await _read_limited_response(response)
+                    body = await _read_limited_response(response)
         price = await asyncio.to_thread(_extract_price, body)
-    except (httpx.HTTPError, ScraperResponseError) as exc:
+    except (httpx.HTTPError, ScraperResponseError, BrowserScraperError) as exc:
         logger.warning(
             "Scraping failed for host=%s error=%s",
             target.hostname,
