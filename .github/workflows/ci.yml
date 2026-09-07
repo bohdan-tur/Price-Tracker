@@ -2,9 +2,13 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [main, "fix/**", "feature/**", "test/**", "chore/**", "refactor/**"]
+    branches: [main, "fix/**", "feature/**", "test/**", "chore/**", "ci/**", "refactor/**"]
   pull_request:
     branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   test:
@@ -68,6 +72,28 @@ jobs:
           -e ENVIRONMENT=test
           -e TEST_DATABASE_URL
           api python -m pytest tests -v
+          --cov=app
+          --cov-branch
+          --cov-report=term-missing
+          --cov-report=xml:coverage.xml
+          --cov-fail-under=75
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.xml
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
 
       - name: Stop containers
         if: always()
