@@ -1,6 +1,7 @@
 # Price Tracker
 
 [![CI](https://github.com/bohdan-tur/price-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/bohdan-tur/price-tracker/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/bohdan-tur/price-tracker/branch/main/graph/badge.svg)](https://app.codecov.io/github/bohdan-tur/price-tracker)
 [![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.136-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
@@ -289,7 +290,9 @@ pip-audit -r requirements.txt
 
 GitHub Actions audits dependencies, checks formatting and linting, validates
 Compose, builds the API image, starts isolated infrastructure, and runs the test
-suite on configured pushes and pull requests.
+suite on configured pushes and pull requests. CI measures line and branch
+coverage, enforces a 75% minimum, archives `coverage.xml`, and publishes results
+to Codecov.
 
 ## Project structure
 
