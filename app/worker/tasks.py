@@ -20,7 +20,7 @@ from app.core.config import settings
 from app.models.item import Item, ItemStatus
 from app.models.notification_event import DeliveryStatus, NotificationEvent
 from app.models.price_history import PriceHistory
-from app.services.scraper import get_current_price
+from app.services.scraper import TransientScraperError, get_current_price
 from app.services.telegram_notification_service import (
     deliver_telegram_notification as deliver_telegram_notification_service,
 )
@@ -28,7 +28,15 @@ from app.worker.celery_app import celery_app
 
 logger = logging.getLogger("root")
 
+
+class PriceCheckError(RuntimeError):
+    """Raised when an item price check finishes unsuccessfully."""
+
+
 _worker_session_factory: async_sessionmaker[AsyncSession] | None = None
+PRICE_CHECK_MAX_RETRIES = 3
+PRICE_CHECK_RETRY_BASE_SECONDS = 30
+PRICE_CHECK_RETRY_MAX_SECONDS = 300
 TELEGRAM_DELIVERY_MAX_RETRIES = 5
 TELEGRAM_DISPATCH_BATCH_SIZE = 100
 TELEGRAM_PROCESSING_TIMEOUT = timedelta(minutes=15)
@@ -84,6 +92,8 @@ async def scrape_item_async(
     if url is None:
         return {"status": "not_found", "item_id": item_id}
 
+    retryable = False
+
     try:
         new_price = await get_current_price(str(url))
 
@@ -91,6 +101,7 @@ async def scrape_item_async(
 
     except Exception as exc:
         new_price = None
+        retryable = isinstance(exc, TransientScraperError)
         error_message = type(exc).__name__
 
         logger.warning(
@@ -109,7 +120,8 @@ async def scrape_item_async(
         if not item:
             return {"item_id": item_id, "status": "not_found"}
 
-        item.last_checked_at = datetime.now(timezone.utc)
+        checked_at = datetime.now(timezone.utc)
+        item.last_checked_at = checked_at
 
         if new_price is None:
             item.status = ItemStatus.ERROR
@@ -120,8 +132,10 @@ async def scrape_item_async(
             return {
                 "status": "error",
                 "item_id": item_id,
+                "retryable": retryable,
             }
 
+        item.last_successful_check_at = checked_at
         previous_price = item.current_price
         item.status = ItemStatus.ACTIVE
         item.last_error = None
@@ -232,9 +246,31 @@ async def get_pending_notification_event_ids(
         return event_ids
 
 
-@celery_app.task(name="scrape_item")
-def scrape_item(item_id: int) -> dict:
-    return asyncio.run(scrape_item_async(item_id))
+@celery_app.task(
+    bind=True,
+    name="scrape_item",
+    max_retries=PRICE_CHECK_MAX_RETRIES,
+)
+def scrape_item(self, item_id: int) -> dict:
+    result = asyncio.run(scrape_item_async(item_id))
+
+    if result["status"] != "error":
+        return result
+
+    error = PriceCheckError(f"Price check failed for item_id={item_id}")
+
+    if result.get("retryable", False) and self.request.retries < self.max_retries:
+        retry_countdown = min(
+            PRICE_CHECK_RETRY_BASE_SECONDS * (2**self.request.retries),
+            PRICE_CHECK_RETRY_MAX_SECONDS,
+        )
+
+        raise self.retry(
+            exc=error,
+            countdown=retry_countdown,
+        ) from error
+
+    raise error
 
 
 @celery_app.task(name="dispatch_price_checks")

@@ -42,7 +42,23 @@ class UnsafeScraperURLError(ValueError):
     """Raised when a scraper target violates the URL security policy."""
 
 
-class ScraperResponseError(RuntimeError):
+class ScraperError(RuntimeError):
+    """Base error for unsuccessful scraping."""
+
+
+class TransientScraperError(ScraperError):
+    """Raised when scraping may succeed after a retry."""
+
+
+class PermanentScraperError(ScraperError):
+    """Raised when retrying the same request is not useful."""
+
+
+class PriceNotFoundError(PermanentScraperError):
+    """Raised when a valid product price cannot be extracted."""
+
+
+class ScraperResponseError(PermanentScraperError):
     """Raised when a scraper response violates resource limits."""
 
 
@@ -282,7 +298,7 @@ def _extract_price(html: bytes) -> Decimal | None:
     return None
 
 
-async def get_current_price(url: str) -> Decimal | None:
+async def get_current_price(url: str) -> Decimal:
     target = await validate_scraper_url(url)
 
     headers = {
@@ -323,18 +339,58 @@ async def get_current_price(url: str) -> Decimal | None:
 
                     body = await _read_limited_response(response)
         price = await asyncio.to_thread(_extract_price, body)
-    except (httpx.HTTPError, ScraperResponseError, BrowserScraperError) as exc:
+
+    except httpx.TransportError as exc:
         logger.warning(
-            "Scraping failed for host=%s error=%s",
+            "Temporary scraping failure for host=%s error=%s",
             target.hostname,
             type(exc).__name__,
         )
-        return None
+        raise TransientScraperError("Temporary scraper transport failure") from exc
+
+    except httpx.HTTPStatusError as exc:
+        status_code = exc.response.status_code
+        retryable = status_code in {408, 429} or 500 <= status_code < 600
+
+        error_class = TransientScraperError if retryable else PermanentScraperError
+
+        logger.warning(
+            "Scraper HTTP request failed for host=%s status=%s",
+            target.hostname,
+            status_code,
+        )
+
+        raise error_class(
+            f"Scraper request failed with HTTP status {status_code}"
+        ) from exc
+
+    except BrowserScraperError as exc:
+        logger.warning(
+            "Temporary browser scraping failure for host=%s",
+            target.hostname,
+        )
+        raise TransientScraperError("Temporary browser scraping failure") from exc
+
+    except ScraperResponseError:
+        logger.warning(
+            "Invalid scraper response for host=%s",
+            target.hostname,
+        )
+        raise
+
+    except httpx.HTTPError as exc:
+        logger.warning(
+            "Permanent HTTP client failure for host=%s error=%s",
+            target.hostname,
+            type(exc).__name__,
+        )
+        raise PermanentScraperError("Permanent scraper HTTP client failure") from exc
 
     if price is None:
         logger.warning(
             "Price was not found for host=%s",
             target.hostname,
         )
+        raise PriceNotFoundError("Price was not found in the scraper response")
 
     return price
