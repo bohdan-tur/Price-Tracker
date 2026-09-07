@@ -2,9 +2,13 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [main, "fix/**", "feature/**", "test/**", "chore/**", "refactor/**"]
+    branches: [main, "fix/**", "feature/**", "test/**", "chore/**", "ci/**", "refactor/**"]
   pull_request:
     branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   test:
@@ -62,12 +66,38 @@ jobs:
       - name: Build API image
         run: docker compose build api
 
+      - name: Prepare coverage output
+        run: mkdir -p coverage-reports && chmod 777 coverage-reports
+
       - name: Run Pytest
         run: >-
           docker compose --profile test run --rm
           -e ENVIRONMENT=test
           -e TEST_DATABASE_URL
+          -e COVERAGE_FILE=/tmp/.coverage
           api python -m pytest tests -v
+          --cov=app
+          --cov-branch
+          --cov-report=term-missing
+          --cov-report=xml:coverage-reports/coverage.xml
+          --cov-fail-under=75
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage-reports/coverage.xml
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage-reports/coverage.xml
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
 
       - name: Stop containers
         if: always()
