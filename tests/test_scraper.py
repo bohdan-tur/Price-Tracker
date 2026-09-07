@@ -9,7 +9,10 @@ import pytest
 from app.core.config import settings
 from app.services.browser_scraper import BrowserScraperError
 from app.services.scraper import (
+    PermanentScraperError,
+    PriceNotFoundError,
     ScraperResponseError,
+    TransientScraperError,
     UnsafeScraperURLError,
     _read_limited_response,
     get_current_price,
@@ -56,16 +59,20 @@ async def test_get_current_price_success(httpx_mock, public_dns):
     assert isinstance(price, Decimal)
 
 
-async def test_get_current_price_not_found(httpx_mock, public_dns):
+async def test_get_current_price_raises_when_price_is_not_found(
+    httpx_mock,
+    public_dns,
+):
+    url = "https://rozetka.com.ua/fake_item/"
+
     httpx_mock.add_response(
-        url="https://rozetka.com.ua/fake_item/",
+        url=url,
         text="<html><body><h1>Product not found</h1></body></html>",
         headers={"Content-Type": "text/html; charset=utf-8"},
     )
 
-    price = await get_current_price("https://rozetka.com.ua/fake_item/")
-
-    assert price is None
+    with pytest.raises(PriceNotFoundError):
+        await get_current_price(url)
 
 
 async def test_get_current_price_network_error(httpx_mock, public_dns):
@@ -73,10 +80,24 @@ async def test_get_current_price_network_error(httpx_mock, public_dns):
         httpx.ReadTimeout("Connection timeout"),
         url="https://rozetka.com.ua/fake_item/",
     )
+    with pytest.raises(TransientScraperError):
+        await get_current_price("https://rozetka.com.ua/fake_item/")
 
-    price = await get_current_price("https://rozetka.com.ua/fake_item/")
 
-    assert price is None
+async def test_get_current_price_raises_permanent_error_on_not_found_response(
+    httpx_mock,
+    public_dns,
+):
+    url = "https://rozetka.com.ua/missing-item/"
+
+    httpx_mock.add_response(
+        url=url,
+        status_code=404,
+        headers={"Content-Type": "text/html"},
+    )
+
+    with pytest.raises(PermanentScraperError):
+        await get_current_price(url)
 
 
 async def test_get_current_price_uses_browser_for_sinsay(
@@ -126,9 +147,9 @@ async def test_get_current_price_handles_browser_error(
         browser_scrape,
     )
 
-    price = await get_current_price(url)
+    with pytest.raises(TransientScraperError):
+        await get_current_price(url)
 
-    assert price is None
     browser_scrape.assert_awaited_once_with(url)
     assert httpx_mock.get_requests() == []
 
@@ -251,10 +272,9 @@ async def test_get_current_price_does_not_follow_redirect(
         status_code=302,
         headers={"Location": "http://127.0.0.1/admin"},
     )
+    with pytest.raises(PermanentScraperError):
+        await get_current_price(url)
 
-    price = await get_current_price(url)
-
-    assert price is None
     assert len(httpx_mock.get_requests()) == 1
     assert str(httpx_mock.get_requests()[0].url) == url
     assert "secret-value" not in caplog.text

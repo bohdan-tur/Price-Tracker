@@ -2,6 +2,8 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from unittest.mock import AsyncMock, call, patch
 
+import pytest
+from celery.exceptions import Retry
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -12,6 +14,7 @@ from app.worker.tasks import (
     dispatch_pending_telegram_notifications,
     dispatch_price_checks,
     get_pending_notification_event_ids,
+    scrape_item,
     scrape_item_async,
 )
 
@@ -73,6 +76,8 @@ async def test_scrape_item_stores_first_price_without_notification(
     assert item.current_price == Decimal("900.00")
     assert item.status is ItemStatus.ACTIVE
     assert item.last_checked_at is not None
+    assert item.last_successful_check_at is not None
+    assert item.last_successful_check_at == item.last_checked_at
     assert item.last_error is None
     assert history_count == 1
     assert notification_count == 0
@@ -179,11 +184,50 @@ async def test_scrape_item_marks_item_as_error_without_leaking_message(
 
     await db_session.refresh(item)
 
-    assert result == {"status": "error", "item_id": item.id}
+    assert result == {
+        "status": "error",
+        "item_id": item.id,
+        "retryable": False,
+    }
     assert item.status is ItemStatus.ERROR
     assert item.last_error == "RuntimeError"
     assert item.last_checked_at is not None
+    assert item.last_successful_check_at is None
     assert item.current_price is None
+
+
+def test_scrape_item_task_does_not_report_failed_check_as_success():
+    failed_result = {"status": "error", "item_id": 123}
+
+    with patch(
+        "app.worker.tasks.scrape_item_async",
+        new=AsyncMock(return_value=failed_result),
+    ):
+        with pytest.raises(RuntimeError):
+            scrape_item(123)
+
+
+def test_scrape_item_task_retries_transient_failure():
+    failed_result = {
+        "status": "error",
+        "item_id": 123,
+        "retryable": True,
+    }
+
+    with (
+        patch(
+            "app.worker.tasks.scrape_item_async",
+            new=AsyncMock(return_value=failed_result),
+        ),
+        patch.object(
+            scrape_item,
+            "retry",
+            side_effect=Retry(),
+        ) as retry,
+    ):
+        with pytest.raises(Retry):
+            scrape_item(123)
+    retry.assert_called_once()
 
 
 async def test_scrape_item_returns_not_found_before_network_call(db_session):

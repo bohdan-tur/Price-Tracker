@@ -26,6 +26,7 @@ class ItemResponse(ItemBase):
     currency: str
     status: ItemStatus
     last_checked_at: datetime | None
+    last_successful_check_at: datetime | None
     last_error: str | None
     user_id: int
 

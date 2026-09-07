@@ -39,6 +39,9 @@ class Item(Base):
         index=True,
     )
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_successful_check_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
     last_error: Mapped[str | None] = mapped_column(Text)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
 
