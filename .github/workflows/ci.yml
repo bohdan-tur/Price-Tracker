@@ -66,6 +66,9 @@ jobs:
       - name: Build API image
         run: docker compose build api
 
+      - name: Run Mypy
+        run: docker compose run --rm --no-deps api python -m mypy app 
+
       - name: Prepare coverage output
         run: mkdir -p coverage-reports && chmod 777 coverage-reports
 
