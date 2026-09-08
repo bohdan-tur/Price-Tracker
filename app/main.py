@@ -2,11 +2,13 @@ import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager, suppress
+from typing import cast
 
 from fastapi import FastAPI, Request
 from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from starlette.types import ExceptionHandler
 
 from app.api.routers import auth, health, item, telegram, user
 from app.bot.application import run_telegram_polling
@@ -50,7 +52,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Price Tracker", description="Price Tracker API", lifespan=lifespan)
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(
+    RateLimitExceeded,
+    cast(ExceptionHandler, _rate_limit_exceeded_handler),
+)
 
 
 @app.middleware("http")

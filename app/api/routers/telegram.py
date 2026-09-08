@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import HttpUrl
 
 from app.api.dependencies import db_dependency, get_current_user
 from app.core.config import settings
@@ -37,4 +38,7 @@ async def create_telegram_link(
 
     deep_link = build_telegram_deep_link(bot_username=bot_username, raw_token=raw_token)
 
-    return TelegramLinkResponse(deep_link=deep_link, expires_at=expires_at)
+    return TelegramLinkResponse(
+        deep_link=HttpUrl(deep_link),
+        expires_at=expires_at,
+    )
