@@ -60,7 +60,7 @@ async def get_all_users(
     query = await db.execute(
         select(User).offset(pagination.offset).limit(pagination.limit)
     )
-    return query.scalars().all()
+    return list(query.scalars().all())
 
 
 @router.get(

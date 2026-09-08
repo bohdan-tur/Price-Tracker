@@ -85,9 +85,9 @@ async def scrape_item_async(
         session_factory = get_worker_session_factory()
 
     async with session_factory() as session:
-        result = await session.execute(select(Item.url).where(Item.id == item_id))
+        url_result = await session.execute(select(Item.url).where(Item.id == item_id))
 
-        url = result.scalar_one_or_none()
+        url = url_result.scalar_one_or_none()
 
     if url is None:
         return {"status": "not_found", "item_id": item_id}
@@ -111,11 +111,11 @@ async def scrape_item_async(
         )
 
     async with session_factory() as session:
-        result = await session.execute(
+        item_result = await session.execute(
             select(Item).where(Item.id == item_id).with_for_update()
         )
 
-        item = result.scalar_one_or_none()
+        item = item_result.scalar_one_or_none()
 
         if not item:
             return {"item_id": item_id, "status": "not_found"}

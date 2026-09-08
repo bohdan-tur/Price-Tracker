@@ -22,7 +22,7 @@ async def create_item(
     item: ItemCreate,
     db: db_dependency,
     user: User = Depends(get_current_user),
-) -> ItemResponse:
+) -> Item:
 
     try:
         await validate_scraper_url(str(item.url))
@@ -55,14 +55,14 @@ async def get_my_items(
     db: db_dependency,
     current_user: User = Depends(get_current_user),
     pagination: PaginationParams = Depends(get_pagination),
-) -> list[ItemResponse]:
+) -> list[Item]:
     query = await db.execute(
         select(Item)
         .where(Item.user_id == current_user.id)
         .limit(pagination.limit)
         .offset(pagination.offset)
     )
-    return query.scalars().all()
+    return list(query.scalars().all())
 
 
 @router.get(
@@ -75,7 +75,7 @@ async def get_item_history(
     db: db_dependency,
     current_user: User = Depends(get_current_user),
     pagination: PaginationParams = Depends(get_pagination),
-) -> list[PriceHistoryResponse]:
+) -> list[PriceHistory]:
     owned_item_id = await db.scalar(
         select(Item.id).where(
             Item.id == item_id,
@@ -96,7 +96,7 @@ async def get_item_history(
         .limit(pagination.limit)
         .offset(pagination.offset)
     )
-    return query.scalars().all()
+    return list(query.scalars().all())
 
 
 @router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)

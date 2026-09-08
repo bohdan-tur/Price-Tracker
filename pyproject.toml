@@ -20,3 +20,18 @@ ignore = ["B008"]
 quote-style = "double"
 
 skip-magic-trailing-comma = false
+
+
+[tool.mypy]
+python_version = "3.13"
+plugins = ["pydantic.mypy"]
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+show_error_codes = true
+cache_dir = "/dev/null"
+
+
+[[tool.mypy.overrides]]
+module = ["celery", "celery.*"]
+ignore_missing_imports = true

@@ -26,7 +26,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @limiter.limit("3/hour")
 async def register_user(
     request: Request, user_data: UserCreate, db: db_dependency
-) -> UserResponse:
+) -> User:
     query = await db.execute(select(User).where(User.email == user_data.email))
     existing_user = query.scalar_one_or_none()
     if existing_user:
